@@ -5,45 +5,42 @@ struct BeachView: View {
     let tideHeight: Double
     let threshold: Double
     let timeUntilChange: String
+    let isCheckmark: Bool
+    let isRising: Bool
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 2) {
             Text(name)
-                .font(.system(.title3, design: .rounded))
-                .fontWeight(.semibold)
+                .font(.headline)
                 .foregroundColor(.primary)
 
-            Text(String(format: "%.1f ft", tideHeight))
-                .font(.system(size: 36, weight: .bold, design: .rounded))
-                .foregroundColor(.blue)
+            HStack(spacing: 4) {
+                Text(String(format: "%.1f ft", tideHeight))
+                    .font(.title2)
+                    .bold()
+                    .foregroundColor(isCheckmark ? .blue : .red)
+                Text(isRising ? "↑" : "↓")
+                    .font(.title3)
+                    .foregroundColor(.gray)
+            }
 
-            Image(systemName: tideHeight <= threshold ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 48, height: 48)
-                .foregroundColor(tideHeight <= threshold ? .green : .red)
+            Image(systemName: isCheckmark ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .font(.system(size: 32))
+                .foregroundColor(isCheckmark ? .green : .red)
 
-            Text("Checkmark when under: \(String(format: "%.1f", threshold)) ft")
+            Text("Beachable when under \(String(format: "%.1f", threshold)) ft")
                 .font(.footnote)
                 .foregroundColor(.secondary)
-            
-            if (timeUntilChange != "Stays same") {
-                let changesToX = tideHeight <= threshold ? "Changes to X at " : "Changes to Checkmark at "
-                Text("\(changesToX)\(timeUntilChange)")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-            }
+
+            Text(timeUntilChange)
+                .font(.caption2)
+                .foregroundColor(.secondary)
         }
         .padding()
+        .background(isCheckmark ? Color.green.opacity(0.08) : Color.red.opacity(0.08))
+        .cornerRadius(12)
         .frame(maxWidth: .infinity)
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [.white, Color.blue.opacity(0.05)]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+        .shadow(radius: 2)
+        .padding(.horizontal, 2)
     }
 }

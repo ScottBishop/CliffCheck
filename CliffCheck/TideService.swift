@@ -61,7 +61,7 @@ class TideService: ObservableObject {
                     formatter.dateFormat = "yyyy-MM-dd HH:mm"
 
                     print("📡 WorldTides API Response:")
-                    for point in decoded.heights { // limit for brevity
+                    for point in decoded.heights.prefix(20) {
                         let time = Date(timeIntervalSince1970: point.dt)
                         let ft = point.height * 3.28084
                         print("- \(formatter.string(from: time)) PST — \(String(format: "%.3f", point.height)) m (\(String(format: "%.2f", ft)) ft)")
@@ -91,18 +91,22 @@ class TideService: ObservableObject {
         for point in forecast {
             let pointInFeet = point.height * 3.28084
             let willBeCheckmark = pointInFeet <= threshold
-
-            // Look for change from checkmark to X or X to checkmark
             if willBeCheckmark != currentlyCheckmark {
-                let time = Date(timeIntervalSince1970: point.dt)
-                let formatter = DateFormatter()
-                formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
-                formatter.dateFormat = "h:mm a"
-                return formatter.string(from: time)
+                let now = Date()
+                let timeUntil = point.dt - now.timeIntervalSince1970
+                if timeUntil > 0 {
+                    let hours = Int(timeUntil / 3600)
+                    let minutes = Int((timeUntil.truncatingRemainder(dividingBy: 3600)) / 60)
+                    let status = currentlyCheckmark ? "✓ Good for" : "✗ Returns in"
+                    return "\(status) \(hours)h \(minutes)m"
+                }
             }
         }
 
-        return "Stays same"
+        
+        let status = currentlyCheckmark ? "✓ Good all day" : "✗ Underwater all day"
+        return status
+
     }
 
     private func sendNotification(for beach: String) {
@@ -132,4 +136,36 @@ struct TideResponse: Codable {
 struct TideData: Codable {
     let dt: TimeInterval
     let height: Double
+}
+
+enum TideTrend {
+    case rising
+    case falling
+    case stable
+}
+
+extension TideService {
+    func getTideTrend(for beach: String) -> TideTrend {
+        guard let forecast = self.tidesForecast[beach], forecast.count >= 2 else {
+            return .stable
+        }
+
+        let sorted = forecast.sorted { $0.dt < $1.dt }
+        let now = Date().timeIntervalSince1970
+        guard let currentIndex = sorted.firstIndex(where: { $0.dt > now }) else {
+            return .stable
+        }
+
+        let recent = sorted[max(0, currentIndex - 1)]
+        let upcoming = sorted[min(sorted.count - 1, currentIndex)]
+
+        let diff = upcoming.height - recent.height
+        if diff > 0.01 {
+            return .rising
+        } else if diff < -0.01 {
+            return .falling
+        } else {
+            return .stable
+        }
+    }
 }
