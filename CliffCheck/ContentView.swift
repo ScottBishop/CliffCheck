@@ -9,45 +9,50 @@ struct ContentView: View {
     @State private var backgroundTint: Color = .white
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                if !tideService.tides.isEmpty {
-                    let goodBeaches = tideService.tides.filter { beach, height in
-                        let threshold = tideService.beachThresholds[beach] ?? 0
-                        return height <= threshold
-                    }.map { $0.key }
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 20) {
+                    if !tideService.tides.isEmpty {
+                        let goodBeaches = tideService.tides.filter { beach, height in
+                            let threshold = tideService.beachThresholds[beach] ?? 0
+                            return height <= threshold
+                        }.map { $0.key }
 
-                    if goodBeaches.isEmpty {
-                        Text("🌊 All beaches are currently under water — check back soon!")
-                            .font(.subheadline)
-                            .padding(.bottom, 5)
-                            .foregroundColor(.red)
-                    } else {
-                        Text("🏖️ Great time for: \(goodBeaches.joined(separator: ", "))!")
-                            .font(.subheadline)
-                            .padding(.bottom, 5)
-                            .foregroundColor(.green)
+                        if goodBeaches.isEmpty {
+                            Text("🌊 All beaches are currently under water — check back soon!")
+                                .font(.subheadline)
+                                .padding(.bottom, 5)
+                                .foregroundColor(.red)
+                        } else {
+                            Text("🏖️ Great time for: \(goodBeaches.joined(separator: ", "))!")
+                                .font(.subheadline)
+                                .padding(.bottom, 5)
+                                .foregroundColor(.green)
+                        }
+                    }
+                    Text("Sunset Today: \(sunsetTime)    Current Tide: \(currentTide)")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+
+                    ForEach(tideService.beachThresholds.sorted(by: { $0.key < $1.key }), id: \.key) { beach, threshold in
+                        let height = tideService.tides[beach] ?? 0
+                        let trend = tideService.getTideTrend(for: beach)
+                        let timeChange = tideService.getTimeUntilThreshold(for: beach)
+
+                        BeachView(name: beach,
+                                  tideHeight: height,
+                                  threshold: threshold,
+                                  timeUntilChange: timeChange,
+                                  isCheckmark: height <= threshold,
+                                  isRising: trend == .rising)
+                            .padding(.horizontal, 2)
                     }
                 }
-                Text("Sunset Today: \(sunsetTime)    Current Tide: \(currentTide)")
-                    .font(.headline)
-                    .foregroundColor(.blue)
-
-                ForEach(tideService.beachThresholds.sorted(by: { $0.key < $1.key }), id: \.key) { beach, threshold in
-                    let height = tideService.tides[beach] ?? 0
-                    let trend = tideService.getTideTrend(for: beach)
-                    let timeChange = tideService.getTimeUntilThreshold(for: beach)
-
-                    BeachView(name: beach,
-                              tideHeight: height,
-                              threshold: threshold,
-                              timeUntilChange: timeChange,
-                              isCheckmark: height <= threshold,
-                              isRising: trend == .rising)
-                        .padding(.horizontal, 2)
-                }
+                .padding(.top, 20)
             }
-            .padding()
+            Spacer(minLength: 0)
+            WaveView()
+                .frame(height: 100)
         }
         .background(backgroundTint.edgesIgnoringSafeArea(.all))
         .onAppear {
