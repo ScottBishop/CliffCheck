@@ -7,11 +7,21 @@ struct ContentView: View {
     @State private var currentTide: String = ""
     @State private var sunsetDate: Date?
     @State private var backgroundTint: Color = .white
+    @State private var sunRotation = 0.0
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 20) {
+                    Image(systemName: "sun.max.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.yellow)
+                        .rotationEffect(.degrees(sunRotation))
+                        .onAppear {
+                            withAnimation(Animation.linear(duration: 20).repeatForever(autoreverses: false)) {
+                                sunRotation = 360
+                            }
+                        }
                     if !tideService.tides.isEmpty {
                         let goodBeaches = tideService.tides.filter { beach, height in
                             let threshold = tideService.beachThresholds[beach] ?? 0
@@ -30,6 +40,9 @@ struct ContentView: View {
                                 .foregroundColor(.green)
                         }
                     }
+                    
+            
+                    
                     Text("Sunset Today: \(sunsetTime)    Current Tide: \(currentTide)")
                         .font(.headline)
                         .foregroundColor(.blue)
