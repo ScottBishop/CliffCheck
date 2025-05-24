@@ -9,7 +9,7 @@ struct BeachView: View {
     let isRising: Bool
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 4) {
             Text(name)
                 .font(.headline)
                 .foregroundColor(.primary)
@@ -30,17 +30,32 @@ struct BeachView: View {
 
             Text("Beachable when under \(String(format: "%.1f", threshold)) ft")
                 .font(.footnote)
-                .foregroundColor(.secondary)
+                .foregroundColor(Color.primary.opacity(0.7))
 
             Text(timeUntilChange)
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundColor(Color.primary.opacity(0.7))
         }
         .padding()
         .background(isCheckmark ? Color.green.opacity(0.08) : Color.red.opacity(0.08))
-        .cornerRadius(12)
+        .cornerRadius(14)
         .frame(maxWidth: .infinity)
         .shadow(radius: 2)
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 8)
     }
+}
+
+#Preview {
+    BeachView(
+        name: "New Break",
+        tideHeight: 3.5,
+        threshold: 1.5,
+        timeUntilChange: "× Underwater all day",
+        isCheckmark: false,
+        isRising: false
+    )
+    .padding()
+    .background(Color(.systemBackground))
+    .previewLayout(.sizeThatFits)
+    .preferredColorScheme(.dark)
 }
