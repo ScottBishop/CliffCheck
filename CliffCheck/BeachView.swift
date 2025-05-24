@@ -12,7 +12,7 @@ struct BeachView: View {
         VStack(spacing: 4) {
             Text(name)
                 .font(.headline)
-                .foregroundColor(.primary)
+                .foregroundColor(Color(.label))
 
             HStack(spacing: 4) {
                 Text(String(format: "%.1f ft", tideHeight))
@@ -30,11 +30,11 @@ struct BeachView: View {
 
             Text("Beachable when under \(String(format: "%.1f", threshold)) ft")
                 .font(.footnote)
-                .foregroundColor(Color.primary.opacity(0.7))
+                .foregroundColor(Color(.secondaryLabel))
 
             Text(timeUntilChange)
                 .font(.caption2)
-                .foregroundColor(Color.primary.opacity(0.7))
+                .foregroundColor(Color(.secondaryLabel))
         }
         .padding()
         .background(isCheckmark ? Color.green.opacity(0.08) : Color.red.opacity(0.08))
