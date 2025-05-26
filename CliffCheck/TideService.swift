@@ -13,7 +13,7 @@ class TideService: ObservableObject {
         "Kellogg Beach": 5.5
     ]
 
-    private let pstTimeZone = TimeZone(identifier: "America/Los_Angeles")
+    private let pstTimeZone = TimeZone(identifier: "America/Los_Angeles") ?? TimeZone.current
 
     func fetchTideData(completion: (() -> Void)? = nil) {
         guard let apiKey = loadAPIKey() else {
@@ -50,9 +50,13 @@ class TideService: ObservableObject {
                     return
                 }
 
-                let ratio = (now - lower.dt) / (upper.dt - lower.dt)
+                let totalDuration = upper.dt - lower.dt
+                let elapsed = now - lower.dt
+                let ratio = elapsed / totalDuration
                 let interpolatedHeight = lower.height + ratio * (upper.height - lower.height)
                 let tideInFeet = interpolatedHeight * 3.28084
+                print("🔍 Raw interpolated height: \(String(format: "%.4f", interpolatedHeight)) meters")
+                print("📏 Converted height: \(String(format: "%.2f", tideInFeet)) ft")
 
                 DispatchQueue.main.async {
                     for (beach, threshold) in self.beachThresholds {
@@ -189,9 +193,9 @@ extension TideService {
             return .stable
         }
 
-        if futureMax.height - currentHeight > 0.05 {
+        if futureMax.height - currentHeight > 0.02 {
             return .rising
-        } else if currentHeight - futureMin.height > 0.05 {
+        } else if currentHeight - futureMin.height > 0.02 {
             return .falling
         }
 
