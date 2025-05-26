@@ -87,26 +87,35 @@ class TideService: ObservableObject {
         guard let currentHeight = tides[beach] else { return "No current tide" }
 
         let currentlyCheckmark = currentHeight <= threshold
+        let now = Date().timeIntervalSince1970
+
+        // Track state and search for the next crossing point
+        var previousState: Bool? = nil
 
         for point in forecast {
             let pointInFeet = point.height * 3.28084
-            let willBeCheckmark = pointInFeet <= threshold
-            if willBeCheckmark != currentlyCheckmark {
-                let now = Date()
-                let timeUntil = point.dt - now.timeIntervalSince1970
-                if timeUntil > 0 {
-                    let hours = Int(timeUntil / 3600)
-                    let minutes = Int((timeUntil.truncatingRemainder(dividingBy: 3600)) / 60)
-                    let status = currentlyCheckmark ? "✓ Good for" : "✗ Returns in"
-                    return "\(status) \(hours)h \(minutes)m"
-                }
+            let pointState = pointInFeet <= threshold
+
+            // Skip points in the past
+            if point.dt <= now {
+                previousState = pointState
+                continue
             }
+
+            // Detect transition only if it flips from the current state
+            if let previous = previousState, previous != pointState && pointState != currentlyCheckmark {
+                let timeUntil = point.dt - now
+                let hours = Int(timeUntil / 3600)
+                let minutes = Int((timeUntil.truncatingRemainder(dividingBy: 3600)) / 60)
+                let status = currentlyCheckmark ? "✓ Good for" : "✗ Returns in"
+                return "\(status) \(hours)h \(minutes)m"
+            }
+
+            previousState = pointState
         }
 
-        
-        let status = currentlyCheckmark ? "✓ Good all day" : "✗ Underwater all day"
-        return status
-
+        // No change detected in the forecast period
+        return currentlyCheckmark ? "✓ Good all day" : "✗ Underwater all day"
     }
 
     private func sendNotification(for beach: String) {
@@ -146,26 +155,40 @@ enum TideTrend {
 
 extension TideService {
     func getTideTrend(for beach: String) -> TideTrend {
-        guard let forecast = self.tidesForecast[beach], forecast.count >= 2 else {
+        guard let forecast = self.tidesForecast[beach], !forecast.isEmpty else {
             return .stable
         }
 
-        let sorted = forecast.sorted { $0.dt < $1.dt }
         let now = Date().timeIntervalSince1970
-        guard let currentIndex = sorted.firstIndex(where: { $0.dt > now }) else {
+
+        // Find the tide point closest to now
+        guard let currentIndex = forecast.enumerated().min(by: {
+            abs($0.element.dt - now) < abs($1.element.dt - now)
+        })?.offset else {
             return .stable
         }
 
-        let recent = sorted[max(0, currentIndex - 1)]
-        let upcoming = sorted[min(sorted.count - 1, currentIndex)]
+        let currentHeight = forecast[currentIndex].height
 
-        let diff = upcoming.height - recent.height
-        if diff > 0.01 {
+        // Define how far ahead/behind we want to look (e.g. ±2 hours)
+        let window: TimeInterval = 2 * 60 * 60
+
+        // Look ahead to find a max/min
+        let futurePoints = forecast.filter { $0.dt > now && $0.dt <= now + window }
+        let pastPoints = forecast.filter { $0.dt < now && $0.dt >= now - window }
+
+        guard let futureMax = futurePoints.max(by: { $0.height < $1.height }),
+              let futureMin = futurePoints.min(by: { $0.height < $1.height }) else {
+            return .stable
+        }
+
+        if futureMax.height - currentHeight > 0.05 {
             return .rising
-        } else if diff < -0.01 {
+        } else if currentHeight - futureMin.height > 0.05 {
             return .falling
-        } else {
-            return .stable
         }
+
+        // If within threshold, it's stable
+        return .stable
     }
 }
