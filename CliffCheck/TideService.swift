@@ -22,7 +22,7 @@ class TideService: ObservableObject {
             return
         }
 
-        let url = URL(string: "https://www.worldtides.info/api/v3?heights&date=today&days=1&localtime&datum=CD&step=60&lat=32.716&lon=-117.254&key=\(apiKey)")!
+        let url = URL(string: "https://www.worldtides.info/api/v3?heights&date=today&days=1&localtime&datum=CD&step=600&lat=32.716&lon=-117.254&key=\(apiKey)")!
 
         URLSession.shared.dataTask(with: url) { data, _, _ in
             guard let data = data else {
@@ -39,16 +39,24 @@ class TideService: ObservableObject {
                     return
                 }
 
-                let now = Date()
+                let now = Date().timeIntervalSince1970
 
-                let currentTide = decoded.heights.min(by: {
-                    abs($0.dt - now.timeIntervalSince1970) < abs($1.dt - now.timeIntervalSince1970)
-                }) ?? decoded.heights.first!
+                let sortedHeights = decoded.heights.sorted(by: { $0.dt < $1.dt })
+
+                guard let lower = sortedHeights.last(where: { $0.dt <= now }),
+                      let upper = sortedHeights.first(where: { $0.dt > now }) else {
+                    print("Unable to interpolate tide height.")
+                    completion?()
+                    return
+                }
+
+                let ratio = (now - lower.dt) / (upper.dt - lower.dt)
+                let interpolatedHeight = lower.height + ratio * (upper.height - lower.height)
+                let tideInFeet = interpolatedHeight * 3.28084
 
                 DispatchQueue.main.async {
                     for (beach, threshold) in self.beachThresholds {
                         let previous = self.tides[beach] ?? 100.0
-                        let tideInFeet = currentTide.height * 3.28084
                         if previous > threshold && tideInFeet <= threshold {
                             self.sendNotification(for: beach)
                         }
@@ -67,10 +75,9 @@ class TideService: ObservableObject {
                         print("- \(formatter.string(from: time)) PST — \(String(format: "%.3f", point.height)) m (\(String(format: "%.2f", ft)) ft)")
                     }
 
-                    let tideTime = Date(timeIntervalSince1970: currentTide.dt)
-                    let tideFt = currentTide.height * 3.28084
-                    print("🕓 Current Time: \(formatter.string(from: now)) PST")
-                    print("🌊 Closest Tide: \(formatter.string(from: tideTime)) PST — \(String(format: "%.3f", currentTide.height)) m (\(String(format: "%.2f", tideFt)) ft)")
+                    let tideTime = Date()
+                    print("🕓 Current Time: \(formatter.string(from: Date(timeIntervalSince1970: now))) PST")
+                    print("🌊 Interpolated Tide: \(String(format: "%.3f", interpolatedHeight)) m (\(String(format: "%.2f", tideInFeet)) ft)")
 
                     completion?()
                 }
