@@ -7,46 +7,50 @@ struct ContentView: View {
     @State private var currentTide: String = ""
     @State private var sunsetDate: Date?
     @State private var sunRotation = 0.0
-    @State private var isRefreshing = false
+    @Environment(\.scenePhase) var scenePhase
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 20) {
-                    Image(systemName: "sun.max.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(.yellow)
-                        .rotationEffect(.degrees(sunRotation))
-                        .onAppear {
-                            withAnimation(Animation.linear(duration: 20).repeatForever(autoreverses: false)) {
-                                sunRotation = 360
+        NavigationStack {
+            VStack(spacing: 0) {
+                List {
+                    VStack(spacing: 20) {
+                        Image(systemName: "sun.max.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.yellow)
+                            .rotationEffect(.degrees(sunRotation))
+                            .onAppear {
+                                withAnimation(Animation.linear(duration: 20).repeatForever(autoreverses: false)) {
+                                    sunRotation = 360
+                                }
+                            }
+
+                        if !tideService.tides.isEmpty {
+                            let goodBeaches = tideService.tides.filter { beach, height in
+                                let threshold = tideService.beachThresholds[beach] ?? 0
+                                return height <= threshold
+                            }.map { $0.key }
+
+                            if goodBeaches.isEmpty {
+                                Text("🌊 All beaches are currently under water — check back soon!")
+                                    .font(.subheadline)
+                                    .padding(.bottom, 5)
+                                    .foregroundColor(.red)
+                            } else {
+                                Text("🏖️ Great time for: \(goodBeaches.joined(separator: ", "))!")
+                                    .font(.subheadline)
+                                    .padding(.bottom, 5)
+                                    .foregroundColor(.green)
                             }
                         }
 
-                    if !tideService.tides.isEmpty {
-                        let goodBeaches = tideService.tides.filter { beach, height in
-                            let threshold = tideService.beachThresholds[beach] ?? 0
-                            return height <= threshold
-                        }.map { $0.key }
-
-                        if goodBeaches.isEmpty {
-                            Text("🌊 All beaches are currently under water — check back soon!")
-                                .font(.subheadline)
-                                .padding(.bottom, 5)
-                                .foregroundColor(.red)
-                        } else {
-                            Text("🏖️ Great time for: \(goodBeaches.joined(separator: ", "))!")
-                                .font(.subheadline)
-                                .padding(.bottom, 5)
-                                .foregroundColor(.green)
-                        }
+                        Text("Sunset Today: \(sunsetTime.isEmpty ? "Loading..." : sunsetTime)    Current Tide: \(currentTide)")
+                            .font(.headline)
+                            .foregroundColor(.blue)
                     }
+                    .padding(.top, 4)
+                    .listRowSeparator(.hidden)
 
-                    Text("Sunset Today: \(sunsetTime.isEmpty ? "Loading..." : sunsetTime)    Current Tide: \(currentTide)")
-                        .font(.headline)
-                        .foregroundColor(.blue)
-
-                    ForEach(tideService.beachThresholds.sorted(by: { $0.key < $1.key }), id: \ .key) { beach, threshold in
+                    ForEach(tideService.beachThresholds.sorted(by: { $0.key < $1.key }), id: \.key) { beach, threshold in
                         let height = tideService.tides[beach] ?? 0
                         let trend = tideService.getTideTrend(for: beach)
                         let timeChange = tideService.getTimeUntilThreshold(for: beach)
@@ -58,16 +62,17 @@ struct ContentView: View {
                                   isCheckmark: height <= threshold,
                                   isRising: trend == .rising)
                             .padding(.horizontal, 8)
+                            .listRowSeparator(.hidden)
                     }
                 }
-                .padding(.top, 20)
                 .refreshable {
                     await refreshData()
                 }
+                .listStyle(.plain)
+                Spacer(minLength: 0)
+                WaveView()
+                    .frame(height: 70)
             }
-            Spacer(minLength: 0)
-            WaveView()
-                .frame(height: 70)
         }
         .background(Color(.systemBackground).edgesIgnoringSafeArea(.all))
         .onAppear {
@@ -75,10 +80,16 @@ struct ContentView: View {
                 await refreshData()
             }
         }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active {
+                Task {
+                    await refreshData()
+                }
+            }
+        }
     }
 
     private func refreshData() async {
-        isRefreshing = true
         await withCheckedContinuation { continuation in
             tideService.fetchTideData {
                 if let anyForecast = tideService.tidesForecast.first?.value,
@@ -93,7 +104,6 @@ struct ContentView: View {
                 continuation.resume()
             }
         }
-        isRefreshing = false
     }
 
     private func fetchSunset() {
