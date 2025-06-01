@@ -161,45 +161,27 @@ struct TideData: Codable {
 enum TideTrend {
     case rising
     case falling
-    case stable
+    case steady
 }
 
 extension TideService {
     func getTideTrend(for beach: String) -> TideTrend {
-        guard let forecast = self.tidesForecast[beach], !forecast.isEmpty else {
-            return .stable
-        }
+        guard let forecast = tidesForecast[beach] else { return .steady }
 
         let now = Date().timeIntervalSince1970
+        let sorted = forecast.sorted(by: { $0.dt < $1.dt })
 
-        // Find the tide point closest to now
-        guard let currentIndex = forecast.enumerated().min(by: {
-            abs($0.element.dt - now) < abs($1.element.dt - now)
-        })?.offset else {
-            return .stable
+        guard let past = sorted.last(where: { $0.dt < now }),
+              let future = sorted.first(where: { $0.dt > now }) else {
+            return .steady
         }
 
-        let currentHeight = forecast[currentIndex].height
-
-        // Define how far ahead/behind we want to look (e.g. ±2 hours)
-        let window: TimeInterval = 2 * 60 * 60
-
-        // Look ahead to find a max/min
-        let futurePoints = forecast.filter { $0.dt > now && $0.dt <= now + window }
-        let pastPoints = forecast.filter { $0.dt < now && $0.dt >= now - window }
-
-        guard let futureMax = futurePoints.max(by: { $0.height < $1.height }),
-              let futureMin = futurePoints.min(by: { $0.height < $1.height }) else {
-            return .stable
-        }
-
-        if futureMax.height - currentHeight > 0.02 {
+        if future.height > past.height {
             return .rising
-        } else if currentHeight - futureMin.height > 0.02 {
+        } else if future.height < past.height {
             return .falling
+        } else {
+            return .steady
         }
-
-        // If within threshold, it's stable
-        return .stable
     }
 }
