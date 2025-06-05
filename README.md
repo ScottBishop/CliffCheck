@@ -39,7 +39,11 @@ It includes:
    * Enable **Push Notifications** and **Background Modes → Remote Notifications** in Signing & Capabilities
    * Ensure your provisioning profile has the `aps-environment` entitlement
 
-4. Build and run on device or simulator
+4. Add Secrets.plist in /CliffCheck which should contain `WorldTidesAPIKey=abc123`
+
+5. Add GoogleService-Info.plist in /CliffCheckfrom which can be found in your firebase project that enables FCM, Crashlytics, and Analytics. 
+
+6. Build and run on device or simulator
 
 ---
 
