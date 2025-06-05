@@ -8,6 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		A1935F7A2DDAC86A00DE7C58 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1935F792DDAC86A00DE7C58 /* Assets.xcassets */; };
+		A1DCA9352DEE57E200696515 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = A1DCA9342DEE57E200696515 /* FirebaseAnalytics */; };
+		A1DCA9372DEE57E200696515 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = A1DCA9362DEE57E200696515 /* FirebaseCrashlytics */; };
+		A1DCA9392DEE57E200696515 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = A1DCA9382DEE57E200696515 /* FirebaseFunctions */; };
+		A1DCA93B2DEE57E200696515 /* FirebaseFunctionsCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = A1DCA93A2DEE57E200696515 /* FirebaseFunctionsCombine-Community */; };
+		A1DCA93D2DEE57E200696515 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = A1DCA93C2DEE57E200696515 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +75,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1DCA9392DEE57E200696515 /* FirebaseFunctions in Frameworks */,
+				A1DCA9352DEE57E200696515 /* FirebaseAnalytics in Frameworks */,
+				A1DCA93D2DEE57E200696515 /* FirebaseMessaging in Frameworks */,
+				A1DCA9372DEE57E200696515 /* FirebaseCrashlytics in Frameworks */,
+				A1DCA93B2DEE57E200696515 /* FirebaseFunctionsCombine-Community in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -131,6 +141,11 @@
 			);
 			name = CliffCheck;
 			packageProductDependencies = (
+				A1DCA9342DEE57E200696515 /* FirebaseAnalytics */,
+				A1DCA9362DEE57E200696515 /* FirebaseCrashlytics */,
+				A1DCA9382DEE57E200696515 /* FirebaseFunctions */,
+				A1DCA93A2DEE57E200696515 /* FirebaseFunctionsCombine-Community */,
+				A1DCA93C2DEE57E200696515 /* FirebaseMessaging */,
 			);
 			productName = CliffCheck;
 			productReference = A1935F2B2DD8CF3400DE7C58 /* CliffCheck.app */;
@@ -215,6 +230,9 @@
 			);
 			mainGroup = A1935F222DD8CF3400DE7C58;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A1DCA9332DEE57E200696515 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A1935F2C2DD8CF3400DE7C58 /* Products */;
 			projectDirPath = "";
@@ -418,6 +436,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = CliffCheck/CliffCheckDebug.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = N9HVZPR45G;
@@ -437,7 +456,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.scottcbishop.CliffCheck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -454,6 +473,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = CliffCheck/CliffCheckRelease.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = N9HVZPR45G;
@@ -473,9 +494,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.scottcbishop.CliffCheck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -594,6 +616,45 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A1DCA9332DEE57E200696515 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.13.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1DCA9342DEE57E200696515 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1DCA9332DEE57E200696515 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		A1DCA9362DEE57E200696515 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1DCA9332DEE57E200696515 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+		A1DCA9382DEE57E200696515 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1DCA9332DEE57E200696515 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+		A1DCA93A2DEE57E200696515 /* FirebaseFunctionsCombine-Community */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1DCA9332DEE57E200696515 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = "FirebaseFunctionsCombine-Community";
+		};
+		A1DCA93C2DEE57E200696515 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1DCA9332DEE57E200696515 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A1935F232DD8CF3400DE7C58 /* Project object */;
 }
