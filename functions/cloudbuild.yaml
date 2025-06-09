@@ -1,0 +1,10 @@
+steps:
+  # Install dependencies using npm install
+  - name: 'gcr.io/cloud-builders/npm'
+    args: ['install', '--no-fund', '--no-audit']
+    # This step will run npm install in the function's source directory.
+
+# (The rest of the build process will be handled by the standard Firebase/Google Cloud Buildpacks)
+# Firebase CLI deployment usually handles the packaging and further build steps after dependencies are set.
+# For Firebase Functions, the 'firebase deploy' command itself orchestrates the build,
+# and by providing this cloudbuild.yaml, we are trying to customize the dependency installation step.
