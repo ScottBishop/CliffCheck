@@ -3,6 +3,7 @@ process.env.FIREBASE_FUNCTIONS_USE_HTTP = "true";
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 const axios = require("axios");
+const {DateTime} = require("luxon");
 require("dotenv").config(); // Load from .env if present
 
 admin.initializeApp();
@@ -115,11 +116,11 @@ async function checkTides() {
 
     console.log(`📊 Retrieved ${data.length} tide entries for ${beach.name}`);
 
-    let lowTideStartEntry = null; // Renamed for clarity
-    let lowTideEndEntry = null; // Renamed for clarity
+    const lowTideWindows = [];
+    let currentWindow = {start: null, end: null};
     let prevBelow = false;
 
-    // Convert meters to feet and find the first occurrence of tide below threshold
+    // Find all low tide windows
     for (const entry of data) {
       const heightFt = entry.height * 3.28084; // Convert meters to feet
       const entryTime = new Date(entry.dt * 1000);
@@ -131,81 +132,103 @@ async function checkTides() {
         timeZone: "America/Los_Angeles",
       });
       console.log(`🌊 Checking ${entryTimeFormatted} PST: ${heightFt.toFixed(2)} ft`);
+
       if (heightFt < beach.thresholdFt) {
-        if (!lowTideStartEntry) lowTideStartEntry = entry;
+        if (!currentWindow.start) {
+          currentWindow.start = entry;
+        }
         prevBelow = true;
       } else if (prevBelow) {
-        lowTideEndEntry = entry;
-        break;
+        currentWindow.end = entry;
+        lowTideWindows.push({...currentWindow});
+        currentWindow = {start: null, end: null};
+        prevBelow = false;
       }
     }
 
-    // Now, the logic to check the window and daylight
-    if (lowTideStartEntry && lowTideEndEntry) {
-      // Convert UTC timestamps to LA timezone for comparison
-      const lowTideStartActual = new Date(lowTideStartEntry.dt * 1000);
-      const lowTideEndActual = new Date(lowTideEndEntry.dt * 1000);
+    // Handle case where low tide extends to end of data
+    if (prevBelow && currentWindow.start) {
+      currentWindow.end = data[data.length - 1];
+      lowTideWindows.push({...currentWindow});
+    }
 
-      const timeOptions = {
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
+    // First check if we have valid daylight hours
+    if (!sunriseDate || !sunsetDate || isNaN(sunriseDate.getTime()) || isNaN(sunsetDate.getTime())) {
+      console.warn("⚠️ Could not verify daylight hours due to missing or invalid sunrise/sunset data. Notification not sent based on daylight rule.");
+      return;
+    }
+
+    console.log(`☀️ Daylight hours: ${sunriseStr} to ${sunsetStr}`);
+
+    // Check if we found any low tide windows
+    if (lowTideWindows.length === 0) {
+      console.log(`ℹ️ No low tide windows found for ${beach.name} today below ${beach.thresholdFt}ft threshold.`);
+      return;
+    }
+
+    // Process each low tide window
+    for (const window of lowTideWindows) {
+      // Convert UTC timestamps to LA timezone using Luxon
+      const lowTideStartLA = DateTime.fromSeconds(window.start.dt)
+          .setZone("America/Los_Angeles");
+      const lowTideEndLA = DateTime.fromSeconds(window.end.dt)
+          .setZone("America/Los_Angeles");
+
+      // Format times for debug logging
+      const lowTideStartFormatted = lowTideStartLA.toLocaleString({
+        ...DateTime.TIME_WITH_SECONDS,
         hour12: true,
-        timeZone: "America/Los_Angeles",
-      };
-      const lowTideStartFormatted = lowTideStartActual.toLocaleString("en-US", timeOptions);
-      const lowTideEndFormatted = lowTideEndActual.toLocaleString("en-US", timeOptions);
+      });
+      const lowTideEndFormatted = lowTideEndLA.toLocaleString({
+        ...DateTime.TIME_WITH_SECONDS,
+        hour12: true,
+      });
+      console.log(`🌊 Low tide window identified: ${lowTideStartFormatted} to ${lowTideEndFormatted}`);
 
-      console.log(`🌊 Actual low tide window identified: ${lowTideStartFormatted} to ${lowTideEndFormatted}.`);
+      // Convert sunrise/sunset strings to Luxon DateTime objects
+      const sunriseLuxon = DateTime.fromFormat(sunriseStr, "h:mm:ss a", {zone: "America/Los_Angeles"});
+      const sunsetLuxon = DateTime.fromFormat(sunsetStr, "h:mm:ss a", {zone: "America/Los_Angeles"});
 
-      if (sunriseDate && sunsetDate && !isNaN(sunriseDate.getTime()) && !isNaN(sunsetDate.getTime())) {
-        const timeOptions = {
-          hour: "numeric",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: true,
-          timeZone: "America/Los_Angeles",
+      // Check for any overlap with daylight hours
+      if (lowTideStartLA < sunsetLuxon && lowTideEndLA > sunriseLuxon) {
+        // Determine if window extends beyond daylight hours
+        const startsBeforeSunrise = lowTideStartLA < sunriseLuxon;
+        const endsAfterSunset = lowTideEndLA > sunsetLuxon;
+
+        // Calculate the actual beachable window
+        const beachableStart = startsBeforeSunrise ? sunriseLuxon : lowTideStartLA;
+        const beachableEnd = endsAfterSunset ? sunsetLuxon : lowTideEndLA;
+
+        // Format sunrise/sunset times without seconds
+        const sunriseTimeShort = sunriseLuxon.toFormat("h:mm a");
+        const sunsetTimeShort = sunsetLuxon.toFormat("h:mm a");
+
+        // Format times in LA timezone for display
+        const beachableStartTimeFormatted = startsBeforeSunrise ?
+          `${sunriseTimeShort} (sunrise)` :
+          beachableStart.toFormat("h:mm a");
+        const beachableEndTimeFormatted = endsAfterSunset ?
+          `${sunsetTimeShort} (sunset)` :
+          beachableEnd.toFormat("h:mm a");
+
+        // Format the beachable window text
+        const beachableWindowFormatted = `${beachableStartTimeFormatted} to ${beachableEndTimeFormatted}`;
+
+        console.log(`✅ Beachable window during daylight: ${beachableWindowFormatted}.`);
+
+        const message = {
+          notification: {
+            title: "🌊 New Break is looking good!",
+            body: `Beachable from ${beachableWindowFormatted}.`,
+          },
+          topic: "tide-updates",
         };
-        console.log(`☀️ Daylight hours: ${sunriseStr} to ${sunsetStr}`);
-
-        // Get the time values in LA timezone
-        const lowTideStartTime = new Date(lowTideStartActual.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
-        const lowTideEndTime = new Date(lowTideEndActual.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
-
-        // Determine the intersection of the low tide window and daylight hours
-        const beachableStart = new Date(Math.max(lowTideStartTime.getTime(), sunriseDate.getTime()));
-        const beachableEnd = new Date(Math.min(lowTideEndTime.getTime(), sunsetDate.getTime()));
-
-        if (beachableStart < beachableEnd) { // Check if there's a valid overlapping period
-          const beachableStartTimeFormatted = beachableStart.toLocaleString("en-US", timeOptions);
-          const beachableEndTimeFormatted = beachableEnd.toLocaleString("en-US", timeOptions);
-
-          console.log(`✅ Beachable window during daylight: ${beachableStartTimeFormatted} to ${beachableEndTimeFormatted}.`);
-
-          const message = {
-            notification: {
-              title: "🌊 New Break is looking good!",
-              body: `Beachable from ${beachableStartTimeFormatted} to ${beachableEndTimeFormatted}.`,
-            },
-            topic: "tide-updates",
-          };
-          console.log(`✅ Preparing notification: ${message.notification.title} - ${message.notification.body}`);
-          await admin.messaging().send(message);
-          console.log(`✅ Notification sent for ${beach.name}`);
-        } else {
-          console.log(`ℹ️ Low tide window (${lowTideStartFormatted} to ${lowTideEndFormatted}) does not overlap with daylight hours. Notification not sent.`);
-        }
+        console.log(`✅ Preparing notification: ${message.notification.title} - ${message.notification.body}`);
+        await admin.messaging().send(message);
+        console.log(`✅ Notification sent for ${beach.name}`);
       } else {
-        console.warn("⚠️ Could not verify daylight hours due to missing or invalid sunrise/sunset data. Notification not sent based on daylight rule.");
+        console.log(`ℹ️ Low tide window (${lowTideStartFormatted} to ${lowTideEndFormatted}) does not overlap with daylight hours. Notification not sent.`);
       }
-    } else {
-      let reason = "";
-      if (!lowTideStartEntry) {
-        reason = "Tide never dropped below threshold during the day.";
-      } else { // Implies lowTideStartEntry was found, but lowTideEndEntry was not
-        reason = "Tide dropped below threshold but did not rise above it again (or window extends beyond data).";
-      }
-      console.log(`ℹ️ No complete low tide window found for ${beach.name} today. ${reason}`);
     }
   } catch (error) { // This catch is for the tide API call and subsequent processing
     console.error("❌ Error fetching tide data or processing:", error);
@@ -215,7 +238,7 @@ async function checkTides() {
 // Production export for scheduled use by Cloud Scheduler
 exports.sendTideAlert = onSchedule(
     {
-      schedule: "every day 06:00",
+      schedule: "every day 05:00",
       timeZone: "America/Los_Angeles",
     },
     async () => {
