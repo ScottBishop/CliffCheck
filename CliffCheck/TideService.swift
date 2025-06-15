@@ -14,8 +14,24 @@ class TideService: ObservableObject {
     ]
 
     private let pstTimeZone = TimeZone(identifier: "America/Los_Angeles") ?? TimeZone.current
+    private let defaults = UserDefaults.standard
+    private let lastUpdateKey = "lastTideUpdate"
+    private let tideForecastKey = "tideForecast"
 
-    func fetchTideData(completion: (() -> Void)? = nil) {
+    func fetchTideData(forceRefresh: Bool = false, completion: (() -> Void)? = nil) {
+        // Try to load cached data first, unless we're forcing a refresh
+        if !forceRefresh, let cachedData = loadCachedTideData() {
+            DispatchQueue.main.async {
+                self.processAndUpdateTides(cachedData, shouldCache: false)
+                completion?()
+            }
+            
+            // If the cache is less than 6 hours old and we're not forcing a refresh, don't fetch new data
+            if let lastUpdate = defaults.object(forKey: lastUpdateKey) as? Date,
+               Date().timeIntervalSince(lastUpdate) < 6 * 3600 {
+                return
+            }
+        }
         guard let apiKey = loadAPIKey() else {
             print("API key not found")
             completion?()
@@ -59,19 +75,12 @@ class TideService: ObservableObject {
                 print("📏 Converted height: \(String(format: "%.2f", tideInFeet)) ft")
 
                 DispatchQueue.main.async {
-                    for (beach, threshold) in self.beachThresholds {
-                        let previous = self.tides[beach] ?? 100.0
-                        if previous > threshold && tideInFeet <= threshold {
-                            self.sendNotification(for: beach)
-                        }
-                        self.tides[beach] = tideInFeet
-                        self.tidesForecast[beach] = decoded.heights
-                    }
-
+                    self.processAndUpdateTides(decoded, shouldCache: true)
+                    
                     let formatter = DateFormatter()
                     formatter.timeZone = self.pstTimeZone
                     formatter.dateFormat = "yyyy-MM-dd HH:mm"
-
+                    
                     print("📡 WorldTides API Response:")
                     for point in decoded.heights.prefix(20) {
                         let time = Date(timeIntervalSince1970: point.dt)
@@ -146,6 +155,67 @@ class TideService: ObservableObject {
             return nil
         }
         return dict["WorldTidesAPIKey"] as? String
+    }
+    // MARK: - Caching
+    
+    private func cacheTideData(_ response: TideResponse) {
+        let encoder = JSONEncoder()
+        if let encoded = try? encoder.encode(response) {
+            defaults.set(encoded, forKey: tideForecastKey)
+            defaults.set(Date(), forKey: lastUpdateKey)
+        }
+    }
+    
+    private func loadCachedTideData() -> TideResponse? {
+        guard let data = defaults.data(forKey: tideForecastKey),
+              let decoded = try? JSONDecoder().decode(TideResponse.self, from: data) else {
+            return nil
+        }
+        return decoded
+    }
+    
+    private func processAndUpdateTides(_ response: TideResponse, shouldCache: Bool) {
+        let now = Date().timeIntervalSince1970
+        let sortedHeights = response.heights.sorted(by: { $0.dt < $1.dt })
+        
+        // Clean up old data points to prevent memory bloat
+        let relevantHeights = sortedHeights.filter { $0.dt >= (now - 3600) } // Keep only future data and last hour
+        
+        guard let lower = sortedHeights.last(where: { $0.dt <= now }),
+              let upper = sortedHeights.first(where: { $0.dt > now }) else {
+            // If we can't find current bounds, try to use the closest available data point
+            if let closest = sortedHeights.min(by: { abs($0.dt - now) < abs($1.dt - now) }) {
+                let tideInFeet = closest.height * 3.28084
+                updateBeachStates(tideInFeet: tideInFeet, heights: relevantHeights)
+            }
+            return
+        }
+        
+        let totalDuration = upper.dt - lower.dt
+        let elapsed = now - lower.dt
+        let ratio = elapsed / totalDuration
+        let interpolatedHeight = lower.height + ratio * (upper.height - lower.height)
+        let tideInFeet = interpolatedHeight * 3.28084
+        
+        print("🔍 Raw interpolated height: \(String(format: "%.4f", interpolatedHeight)) meters")
+        print("📏 Converted height: \(String(format: "%.2f", tideInFeet)) ft")
+        
+        if shouldCache {
+            cacheTideData(response)
+        }
+        
+        updateBeachStates(tideInFeet: tideInFeet, heights: relevantHeights)
+    }
+    
+    private func updateBeachStates(tideInFeet: Double, heights: [TideData]) {
+        for (beach, threshold) in self.beachThresholds {
+            let previous = self.tides[beach] ?? 100.0
+            if previous > threshold && tideInFeet <= threshold {
+                self.sendNotification(for: beach)
+            }
+            self.tides[beach] = tideInFeet
+            self.tidesForecast[beach] = heights
+        }
     }
 }
 

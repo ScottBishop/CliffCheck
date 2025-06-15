@@ -6,7 +6,7 @@ struct ContentView: View {
     @State private var sunsetTime: String = ""
     @State private var currentTide: String = ""
     @State private var sunsetDate: Date?
-    @State private var sunRotation = 0.0
+    @State private var isAnimatingSun = false
     @Environment(\.scenePhase) var scenePhase
 
     var body: some View {
@@ -17,10 +17,10 @@ struct ContentView: View {
                         Image(systemName: "sun.max.fill")
                             .font(.system(size: 40))
                             .foregroundColor(.yellow)
-                            .rotationEffect(.degrees(sunRotation))
+                            .rotationEffect(.degrees(isAnimatingSun ? 360 : 0))
                             .onAppear {
                                 withAnimation(Animation.linear(duration: 20).repeatForever(autoreverses: false)) {
-                                    sunRotation = 360
+                                    isAnimatingSun = true
                                 }
                             }
 
@@ -66,7 +66,7 @@ struct ContentView: View {
                     }
                 }
                 .refreshable {
-                    await refreshData()
+                    await refreshData(forceRefresh: true)
                 }
                 .listStyle(.plain)
                 Spacer(minLength: 0)
@@ -77,21 +77,21 @@ struct ContentView: View {
         .background(Color(.systemBackground).edgesIgnoringSafeArea(.all))
         .onAppear {
             Task {
-                await refreshData()
+                await refreshData(forceRefresh: true)
             }
         }
         .onChange(of: scenePhase) {
             if scenePhase == .active {
                 Task {
-                    await refreshData()
+                    await refreshData(forceRefresh: false)
                 }
             }
         }
     }
 
-    private func refreshData() async {
+    private func refreshData(forceRefresh: Bool = false) async {
         await withCheckedContinuation { continuation in
-            tideService.fetchTideData {
+            tideService.fetchTideData(forceRefresh: forceRefresh) {
                 if let anyForecast = tideService.tidesForecast.first?.value,
                    let closest = anyForecast.min(by: {
                        abs($0.dt - Date().timeIntervalSince1970) <

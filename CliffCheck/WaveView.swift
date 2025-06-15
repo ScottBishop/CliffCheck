@@ -1,5 +1,26 @@
 import SwiftUI
 
+struct WaveAnimationModifier: ViewModifier {
+    let amplitude: CGFloat
+    let frequency: Double
+    let isAnimating: Bool
+    
+    @State private var offsetY: CGFloat = 0
+    
+    func body(content: Content) -> some View {
+        content
+            .offset(y: offsetY)
+            .onAppear {
+                withAnimation(
+                    .easeInOut(duration: 1/frequency)
+                    .repeatForever(autoreverses: true)
+                ) {
+                    offsetY = amplitude
+                }
+            }
+    }
+}
+
 struct Wave: Shape {
     var strength: Double
     var frequency: Double
@@ -13,18 +34,22 @@ struct Wave: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let midHeight = rect.height / 2
+        let width = rect.width
 
-        path.move(to: CGPoint(x: 0, y: midHeight))
-
-        for x in stride(from: 0, through: rect.width, by: 1) {
-            let relativeX = x / rect.width
+        // Start drawing from outside the left edge
+        path.move(to: CGPoint(x: -width, y: rect.height))
+        
+        // Draw waves across an extended width (3x normal width)
+        for x in stride(from: -width, through: width * 2, by: 1) {
+            let relativeX = x / width
             let sine = sin((relativeX + phase) * .pi * 2 * frequency)
             let y = midHeight + CGFloat(sine) * CGFloat(strength)
             path.addLine(to: CGPoint(x: x, y: y))
         }
 
-        path.addLine(to: CGPoint(x: rect.width, y: rect.height))
-        path.addLine(to: CGPoint(x: 0, y: rect.height))
+        // Complete the path by extending to the right edge
+        path.addLine(to: CGPoint(x: width * 2, y: rect.height))
+        path.addLine(to: CGPoint(x: -width, y: rect.height))
         path.closeSubpath()
 
         return path
@@ -32,27 +57,38 @@ struct Wave: Shape {
 }
 
 struct WaveView: View {
-    @State private var phase1: Double = 0
-    @State private var phase2: Double = 0
+    @State private var phase: Double = 0
 
     var body: some View {
         ZStack {
-            Wave(strength: 10, frequency: 1.5, phase: phase1)
-                .fill(Color.blue.opacity(0.2))
+            // Background wave
+            Wave(strength: 10, frequency: 1.5, phase: phase)
+                .fill(Color.blue.opacity(0.15))
                 .frame(height: 100)
                 .offset(y: 30)
-                .animation(.linear(duration: 6).repeatForever(autoreverses: false), value: phase1)
+                .clipShape(Rectangle())
+                .modifier(WaveAnimationModifier(amplitude: 3, frequency: 0.5, isAnimating: true))
 
-            Wave(strength: 15, frequency: 1.2, phase: phase2)
-                .fill(Color.blue.opacity(0.3))
+            // Middle wave
+            Wave(strength: 15, frequency: 1.2, phase: phase * 0.9)
+                .fill(Color.blue.opacity(0.2))
                 .frame(height: 120)
-                .animation(.linear(duration: 8).repeatForever(autoreverses: false), value: phase2)
+                .offset(y: 15)
+                .clipShape(Rectangle())
+                .modifier(WaveAnimationModifier(amplitude: 4, frequency: 0.4, isAnimating: true))
+
+            // Foreground wave
+            Wave(strength: 18, frequency: 1.0, phase: phase * 0.8)
+                .fill(Color.blue.opacity(0.25))
+                .frame(height: 130)
+                .clipShape(Rectangle())
+                .modifier(WaveAnimationModifier(amplitude: 5, frequency: 0.3, isAnimating: true))
         }
         .onAppear {
-            withAnimation {
-                phase1 = 1
-                phase2 = 1
+            withAnimation(.linear(duration: 16).repeatForever(autoreverses: false)) {
+                phase = 4
             }
         }
     }
-}
+    }
+
