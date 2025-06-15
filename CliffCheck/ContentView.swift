@@ -11,9 +11,9 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            ZStack(alignment: .bottom) {
                 List {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 16) {
                         Image(systemName: "sun.max.fill")
                             .font(.system(size: 40))
                             .foregroundColor(.yellow)
@@ -31,15 +31,26 @@ struct ContentView: View {
                             }.map { $0.key }
 
                             if goodBeaches.isEmpty {
-                                Text("🌊 All beaches are currently under water — check back soon!")
-                                    .font(.subheadline)
-                                    .padding(.bottom, 5)
+                                Text("🌊 All beaches are currently under water")
+                                    .font(.system(.title3, design: .rounded))
+                                    .fontWeight(.medium)
+                                    .multilineTextAlignment(.center)
                                     .foregroundColor(.red)
-                            } else {
-                                Text("🏖️ Great time for: \(goodBeaches.joined(separator: ", "))!")
+                                    .padding(.vertical, 8)
+                                Text("Check back soon!")
                                     .font(.subheadline)
-                                    .padding(.bottom, 5)
+                                    .foregroundColor(.red.opacity(0.8))
+                            } else {
+                                Text("🏖️ Great time for:")
+                                    .font(.system(.title3, design: .rounded))
+                                    .fontWeight(.medium)
                                     .foregroundColor(.green)
+                                    .padding(.bottom, 4)
+                                Text(goodBeaches.joined(separator: ", "))
+                                    .font(.headline)
+                                    .multilineTextAlignment(.center)
+                                    .foregroundColor(.green.opacity(0.8))
+                                    .padding(.bottom, 8)
                             }
                         }
 
@@ -64,14 +75,20 @@ struct ContentView: View {
                             .padding(.horizontal, 8)
                             .listRowSeparator(.hidden)
                     }
+                    
                 }
                 .refreshable {
                     await refreshData(forceRefresh: true)
                 }
                 .listStyle(.plain)
-                Spacer(minLength: 0)
+                // Add some extra padding to the list content to prevent wave overlap
+                .safeAreaInset(edge: .bottom) {
+                    Color.clear.frame(height: 70)
+                }
+                
                 WaveView()
                     .frame(height: 70)
+                    .allowsHitTesting(false)
             }
         }
         .background(Color(.systemBackground).edgesIgnoringSafeArea(.all))
