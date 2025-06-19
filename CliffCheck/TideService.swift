@@ -207,9 +207,11 @@ class TideService: ObservableObject {
     }
     
     private func updateBeachStates(tideInFeet: Double, heights: [TideData]) {
-        for (beach, threshold) in self.beachThresholds {
-            self.tides[beach] = tideInFeet
-            self.tidesForecast[beach] = heights
+        withAnimation(.easeInOut(duration: 0.3)) {
+            for (beach, threshold) in self.beachThresholds {
+                self.tides[beach] = tideInFeet
+                self.tidesForecast[beach] = heights
+            }
         }
     }
 }

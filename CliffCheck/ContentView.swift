@@ -21,16 +21,15 @@ struct ContentView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                             .onAppear {
-                                withAnimation(Animation.linear(duration: 20).repeatForever(autoreverses: false)) {
-                                    isAnimatingSun = true
-                                }
+                                isAnimatingSun = true
                             }
+                            .animation(.linear(duration: 20).repeatForever(autoreverses: false), value: isAnimatingSun)
 
                         if !tideService.tides.isEmpty {
                             let goodBeaches = tideService.tides.filter { beach, height in
                                 let threshold = tideService.beachThresholds[beach] ?? 0
                                 return height <= threshold
-                            }.map { $0.key }
+                            }.map { $0.key }.sorted()
 
                             if goodBeaches.isEmpty {
                                 Text("🌊 All beaches are currently under water")
@@ -63,7 +62,8 @@ struct ContentView: View {
                     .padding(.top, 4)
                     .listRowSeparator(.hidden)
 
-                    ForEach(tideService.beachThresholds.sorted(by: { $0.key < $1.key }), id: \.key) { beach, threshold in
+                    ForEach(Array(tideService.beachThresholds.keys).sorted(), id: \.self) { beach in
+                        let threshold = tideService.beachThresholds[beach] ?? 0
                         let height = tideService.tides[beach] ?? 0
                         let trend = tideService.getTideTrend(for: beach)
                         let timeChange = tideService.getTimeUntilThreshold(for: beach)
