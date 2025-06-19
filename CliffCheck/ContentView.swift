@@ -18,6 +18,8 @@ struct ContentView: View {
                             .font(.system(size: 40))
                             .foregroundColor(.yellow)
                             .rotationEffect(.degrees(isAnimatingSun ? 360 : 0))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                             .onAppear {
                                 withAnimation(Animation.linear(duration: 20).repeatForever(autoreverses: false)) {
                                     isAnimatingSun = true
@@ -44,7 +46,7 @@ struct ContentView: View {
                                 Text("🏖️ Great time for:")
                                     .font(.system(.title3, design: .rounded))
                                     .fontWeight(.medium)
-                                    .foregroundColor(.green)
+                                    .foregroundColor(.green.opacity(0.8))
                                     .padding(.bottom, 4)
                                 Text(goodBeaches.joined(separator: ", "))
                                     .font(.headline)
@@ -107,23 +109,38 @@ struct ContentView: View {
     }
 
     private func refreshData(forceRefresh: Bool = false) async {
+        // First, fetch tide data
         await withCheckedContinuation { continuation in
+            var hasResumed = false
             tideService.fetchTideData(forceRefresh: forceRefresh) {
-                if let anyForecast = tideService.tidesForecast.first?.value,
-                   let closest = anyForecast.min(by: {
-                       abs($0.dt - Date().timeIntervalSince1970) <
-                       abs($1.dt - Date().timeIntervalSince1970)
-                   }) {
-                    let feet = closest.height * 3.28084
-                    currentTide = String(format: "%.1f ft", feet)
+                if !hasResumed {
+                    hasResumed = true
+                    if let anyForecast = tideService.tidesForecast.first?.value,
+                       let closest = anyForecast.min(by: {
+                           abs($0.dt - Date().timeIntervalSince1970) <
+                           abs($1.dt - Date().timeIntervalSince1970)
+                       }) {
+                        let feet = closest.height * 3.28084
+                        currentTide = String(format: "%.1f ft", feet)
+                    }
+                    continuation.resume()
                 }
-                fetchSunset()
-                continuation.resume()
+            }
+        }
+        
+        // Then, fetch sunset data
+        await withCheckedContinuation { continuation in
+            var hasResumed = false
+            fetchSunset() {
+                if !hasResumed {
+                    hasResumed = true
+                    continuation.resume()
+                }
             }
         }
     }
 
-    private func fetchSunset() {
+    private func fetchSunset(completion: @escaping () -> Void) {
         let sunsetService = SunsetService()
         let location = CLLocationCoordinate2D(latitude: 32.716, longitude: -117.254)
         sunsetService.getSunsetTime(for: location) { timeString in
@@ -143,6 +160,7 @@ struct ContentView: View {
                                                              of: today)
                 }
             }
+            completion()
         }
     }
 }

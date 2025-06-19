@@ -1,5 +1,4 @@
 import Foundation
-import UserNotifications
 import SwiftUI
 import CoreLocation
 
@@ -19,22 +18,31 @@ class TideService: ObservableObject {
     private let tideForecastKey = "tideForecast"
 
     func fetchTideData(forceRefresh: Bool = false, completion: (() -> Void)? = nil) {
+        var hasCompleted = false
+        let safeComplete = {
+            if !hasCompleted {
+                hasCompleted = true
+                completion?()
+            }
+        }
+        
         // Try to load cached data first, unless we're forcing a refresh
         if !forceRefresh, let cachedData = loadCachedTideData() {
             DispatchQueue.main.async {
                 self.processAndUpdateTides(cachedData, shouldCache: false)
-                completion?()
-            }
-            
-            // If the cache is less than 6 hours old and we're not forcing a refresh, don't fetch new data
-            if let lastUpdate = defaults.object(forKey: lastUpdateKey) as? Date,
-               Date().timeIntervalSince(lastUpdate) < 6 * 3600 {
-                return
+                
+                // If the cache is less than 6 hours old and we're not forcing a refresh, don't fetch new data
+                if let lastUpdate = self.defaults.object(forKey: self.lastUpdateKey) as? Date,
+                   Date().timeIntervalSince(lastUpdate) < 6 * 3600 {
+                    safeComplete()
+                    return
+                }
             }
         }
+        
         guard let apiKey = loadAPIKey() else {
             print("API key not found")
-            completion?()
+            safeComplete()
             return
         }
 
@@ -43,7 +51,7 @@ class TideService: ObservableObject {
         URLSession.shared.dataTask(with: url) { data, _, _ in
             guard let data = data else {
                 print("No data returned")
-                completion?()
+                safeComplete()
                 return
             }
             do {
@@ -51,7 +59,7 @@ class TideService: ObservableObject {
 
                 if decoded.heights.isEmpty {
                     print("No tide data available.")
-                    completion?()
+                    safeComplete()
                     return
                 }
 
@@ -62,7 +70,7 @@ class TideService: ObservableObject {
                 guard let lower = sortedHeights.last(where: { $0.dt <= now }),
                       let upper = sortedHeights.first(where: { $0.dt > now }) else {
                     print("Unable to interpolate tide height.")
-                    completion?()
+                    safeComplete()
                     return
                 }
 
@@ -92,11 +100,11 @@ class TideService: ObservableObject {
                     print("🕓 Current Time: \(formatter.string(from: Date(timeIntervalSince1970: now))) PST")
                     print("🌊 Interpolated Tide: \(String(format: "%.3f", interpolatedHeight)) m (\(String(format: "%.2f", tideInFeet)) ft)")
 
-                    completion?()
+                    safeComplete()
                 }
             } catch {
                 print("Error decoding tide data: \(error)")
-                completion?()
+                safeComplete()
             }
         }.resume()
     }
@@ -136,15 +144,6 @@ class TideService: ObservableObject {
 
         // No change detected in the forecast period
         return currentlyCheckmark ? "✓ Good all day" : "✗ Underwater all day"
-    }
-
-    private func sendNotification(for beach: String) {
-        let content = UNMutableNotificationContent()
-        content.title = "Tide Alert"
-        content.body = "\(beach) is now a check mark!"
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(request)
     }
 
     private func loadAPIKey() -> String? {
@@ -209,10 +208,6 @@ class TideService: ObservableObject {
     
     private func updateBeachStates(tideInFeet: Double, heights: [TideData]) {
         for (beach, threshold) in self.beachThresholds {
-            let previous = self.tides[beach] ?? 100.0
-            if previous > threshold && tideInFeet <= threshold {
-                self.sendNotification(for: beach)
-            }
             self.tides[beach] = tideInFeet
             self.tidesForecast[beach] = heights
         }
